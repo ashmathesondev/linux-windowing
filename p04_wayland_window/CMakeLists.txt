@@ -1,0 +1,3 @@
+add_executable(p04_wayland_window main.cpp)
+ww_target_defaults(p04_wayland_window)
+target_link_libraries(p04_wayland_window PRIVATE ww_wayland_protocols PkgConfig::WAYLAND_CLIENT)

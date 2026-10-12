@@ -1,0 +1,3 @@
+add_executable(p07_renderer main.cpp)
+ww_target_defaults(p07_renderer)
+target_link_libraries(p07_renderer PRIVATE ww_renderer ww_platform)

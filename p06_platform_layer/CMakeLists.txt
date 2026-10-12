@@ -1,0 +1,3 @@
+add_executable(p06_platform_layer main.cpp)
+ww_target_defaults(p06_platform_layer)
+target_link_libraries(p06_platform_layer PRIVATE ww_platform)

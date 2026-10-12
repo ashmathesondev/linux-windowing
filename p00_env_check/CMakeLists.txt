@@ -1,0 +1,11 @@
+add_executable(p00_env_check main.cpp)
+ww_target_defaults(p00_env_check)
+
+if(WW_BUILD_X11)
+  target_compile_definitions(p00_env_check PRIVATE WW_HAVE_X11)
+  target_link_libraries(p00_env_check PRIVATE PkgConfig::X11)
+endif()
+if(WW_BUILD_WAYLAND)
+  target_compile_definitions(p00_env_check PRIVATE WW_HAVE_WAYLAND)
+  target_link_libraries(p00_env_check PRIVATE PkgConfig::WAYLAND_CLIENT)
+endif()
