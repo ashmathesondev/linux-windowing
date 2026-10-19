@@ -1,6 +1,10 @@
 {
   "version": 3,
-  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 20,
+    "patch": 0
+  },
   "configurePresets": [
     {
       "name": "base",
@@ -58,13 +62,43 @@
         "CMAKE_CXX_COMPILER": "clang++",
         "WW_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "gcc-assert",
+      "displayName": "GCC Debug with library assertions",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_CXX_FLAGS": "-D_GLIBCXX_ASSERTIONS"
+      }
     }
   ],
   "buildPresets": [
-    { "name": "gcc-debug", "configurePreset": "gcc-debug" },
-    { "name": "gcc-release", "configurePreset": "gcc-release" },
-    { "name": "clang-debug", "configurePreset": "clang-debug" },
-    { "name": "clang-release", "configurePreset": "clang-release" },
-    { "name": "clang-asan", "configurePreset": "clang-asan" }
+    {
+      "name": "gcc-debug",
+      "configurePreset": "gcc-debug"
+    },
+    {
+      "name": "gcc-release",
+      "configurePreset": "gcc-release"
+    },
+    {
+      "name": "clang-debug",
+      "configurePreset": "clang-debug"
+    },
+    {
+      "name": "clang-release",
+      "configurePreset": "clang-release"
+    },
+    {
+      "name": "clang-asan",
+      "configurePreset": "clang-asan"
+    },
+    {
+      "name": "gcc-assert",
+      "configurePreset": "gcc-assert"
+    }
   ]
 }
