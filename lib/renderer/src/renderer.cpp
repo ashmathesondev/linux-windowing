@@ -29,7 +29,11 @@ struct Renderer::Impl {
 
     void roundRectPath(Rect r, float radius) {
         const double x = r.x, y = r.y, w = r.w, h = r.h;
-        const double rad = std::clamp(static_cast<double>(radius), 0.0, std::min(w, h) / 2.0);
+        // A rectangle can be empty or even negative (a card on its first frame, an inset() of
+        // something tiny). std::clamp(v, lo, hi) with hi < lo is undefined, and libstdc++
+        // asserts on it, so keep the upper bound at 0 or more.
+        const double maxRadius = std::max(std::min(w, h) / 2.0, 0.0);
+        const double rad = std::clamp(static_cast<double>(radius), 0.0, maxRadius);
         if (rad <= 0.0) {
             cairo_rectangle(cr, x, y, w, h);
             return;
