@@ -100,7 +100,13 @@ Recommended approach is **immediate mode** (simplest to get right), with retaine
 - Idle redraw: render only when something changed.
 - **Deliverable:** a polished demo that copy/pastes text and looks sharp on a scaled display.
 
-### Stage 10 (optional): GPU path
+### Stage 10: Standard desktop controls
+- Menu bar, popup and context menus (checkable and disabled items, separators, keyboard navigation, shortcut text).
+- Tooltips with a hover delay, modal dialogs and a message box, tree view, spin box, status bar, key shortcuts.
+- Mapping from Win32 controls (`BUTTON`, `EDIT`, `COMBOBOX`, `SysTreeView32`, `MessageBox`) to the immediate mode calls.
+- **Deliverable:** `p10_controls`, a file manager style window using every control, with headless tests.
+
+### Stage 11 (optional): GPU path
 - EGL context on both backends (`EGL_PLATFORM_X11_KHR`, `EGL_PLATFORM_WAYLAND_KHR`).
 - Draw your UI batches with OpenGL, or create a Vulkan surface with `VK_KHR_xlib_surface` / `VK_KHR_wayland_surface`.
 - Natural fit given your DX12 and OpenXR background: swapchain, frame pacing, present modes.
@@ -162,4 +168,4 @@ Libraries from stages 6 to 8 are static libs so later projects link against them
 | 6 (abstraction) | 2 to 3 |
 | 7 (renderer and text) | 5 to 10 |
 | 8 (widgets) | 8 to 15 |
-| 9 to 10 (polish, GPU) | open ended |
+| 9 to 11 (polish, controls, GPU) | open ended |

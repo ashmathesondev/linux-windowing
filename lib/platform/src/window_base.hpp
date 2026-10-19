@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <deque>
 #include <memory>
+#include <utility>
 
 #include "ww/window.hpp"
 
@@ -52,7 +53,9 @@ inline float scaleFromEnvironment() {
 class WindowBase : public Window {
 public:
     // Internal API: backends and their callback functions queue events with push().
-    void push(Event e) { queue_.push_back(std::move(e)); }
+    // Constructs the event in place in the queue (also avoids a GCC -Wmaybe-uninitialized false positive).
+    template <typename E>
+    void push(E&& e) { queue_.emplace_back(std::forward<E>(e)); }
     bool pop(Event& out) {
         if (queue_.empty()) return false;
         out = std::move(queue_.front());

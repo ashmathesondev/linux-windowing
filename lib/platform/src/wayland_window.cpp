@@ -15,6 +15,7 @@
 #include <poll.h>
 #include <sys/mman.h>
 #include <sys/timerfd.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
@@ -23,6 +24,7 @@
 #include <cerrno>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -505,6 +507,80 @@ const wl_registry_listener kRegistryListener = {
     },
     .global_remove = [](void*, wl_registry*, uint32_t) {}};
 
+namespace {
+
+// ---------------------------------------------------------------------------
+// Finding the compositor.
+//
+// wl_display_connect(nullptr) only looks at $WAYLAND_DISPLAY (default "wayland-0")
+// inside $XDG_RUNTIME_DIR. That fails in a terminal or IDE that did not inherit
+// the desktop session's environment, and when a nested compositor such as weston
+// uses another socket name. This helper tries, in order:
+//   1. the name given with --display NAME (no fallback: you asked for that one)
+//   2. $WAYLAND_DISPLAY
+//   3. every wayland-N socket in $XDG_RUNTIME_DIR, the first that accepts us
+// A relative name is looked up in $XDG_RUNTIME_DIR, an absolute path is used as is.
+// (Programs built on ww::Window select one with $WAYLAND_DISPLAY; there is no --display option.)
+// ---------------------------------------------------------------------------
+std::string runtimeDir() {
+    const char* dir = std::getenv("XDG_RUNTIME_DIR");
+    return dir && *dir ? dir : "/run/user/" + std::to_string(getuid());
+}
+
+std::string socketPath(const std::string& name) { return !name.empty() && name[0] == '/' ? name : runtimeDir() + "/" + name; }
+
+std::vector<std::string> listSockets() {
+    std::vector<std::string> names;
+    if (DIR* dir = opendir(runtimeDir().c_str())) {
+        while (const dirent* entry = readdir(dir)) {
+            const std::string name = entry->d_name;
+            // "wayland-0.lock" is a lock file next to the socket, not a socket.
+            if (name.rfind("wayland-", 0) == 0 && name.find('.') == std::string::npos) names.push_back(name);
+        }
+        closedir(dir);
+    }
+    std::sort(names.begin(), names.end());
+    return names;
+}
+
+wl_display* connectToCompositor(const char* requested, std::string& usedName) {
+    if (requested && *requested) {
+        usedName = requested;
+        return wl_display_connect(socketPath(requested).c_str());
+    }
+    if (const char* env = std::getenv("WAYLAND_DISPLAY"); env && *env) {
+        if (wl_display* display = wl_display_connect(socketPath(env).c_str())) {
+            usedName = env;
+            return display;
+        }
+    }
+    for (const std::string& name : listSockets()) {
+        if (wl_display* display = wl_display_connect(socketPath(name).c_str())) {
+            usedName = name;
+            return display;
+        }
+    }
+    return nullptr;
+}
+
+void explainNoCompositor(const char* requested) {
+    const char* session = std::getenv("XDG_SESSION_TYPE");
+    const char* env = std::getenv("WAYLAND_DISPLAY");
+    const std::vector<std::string> sockets = listSockets();
+    std::fprintf(stderr, "Cannot connect to a Wayland compositor.\n");
+    if (requested && *requested) std::fprintf(stderr, "  --display        = %s (not found or refused the connection)\n", requested);
+    std::fprintf(stderr, "  XDG_SESSION_TYPE = %s\n", session && *session ? session : "(unset)");
+    std::fprintf(stderr, "  WAYLAND_DISPLAY  = %s\n", env && *env ? env : "(unset)");
+    std::fprintf(stderr, "  socket directory = %s (%zu wayland-* socket(s) found)\n", runtimeDir().c_str(), sockets.size());
+    if (session && std::strcmp(session, "x11") == 0)
+        std::fprintf(stderr, "You are in an X11 session. Log in with a Wayland session, or start a nested compositor:\n"
+                             "  weston --backend=x11 --socket=wayland-dev &\n"
+                             "  <this program> --display wayland-dev\n");
+}
+
+
+} // namespace
+
 // ============================================================================
 // Setup and teardown
 // ============================================================================
@@ -513,8 +589,12 @@ bool WaylandWindow::init(const WindowConfig& config) {
     title_ = config.title;
     forcedScale_ = static_cast<int>(std::lround(scaleFromEnvironment()));
 
-    display_ = wl_display_connect(nullptr);
-    if (!display_) return false;
+    std::string displayName;
+    display_ = connectToCompositor(nullptr, displayName);
+    if (!display_) {
+        explainNoCompositor(nullptr);
+        return false;
+    }
 
     xkbContext_ = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     repeatTimer_ = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);

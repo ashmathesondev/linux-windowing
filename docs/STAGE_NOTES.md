@@ -30,5 +30,12 @@ Short reading guides. Each stage's `main.cpp` starts with a comment block explai
 ## Stage 9
 - Same toolkit, used as an application. Compare `p09_polish/main.cpp` with `p08_widgets/gallery.hpp`.
 
-## Where to go next (stage 10)
+## Stage 10: controls
+- Menus are one `openMenu_` id and a popup built by `menuItem` calls. The popup size is remembered from the previous frame, like a card height.
+- Modal dialogs dim the window and set `blockOutside_`, so `hovered()` and `registerFocusable()` ignore every widget not drawn inside the dialog. Call dialogs last.
+- A popup built after the widget it belongs to (context menu) must still block that widget, so `hovered()` also checks the previous frame's popup rectangle.
+- `tooltip()` asks the window loop to wake when it is due through `nextWakeupMs()`.
+- Tree nodes keep one open flag each; indentation and the id scope are pushed by `treeNode` and popped by `treePop`.
+
+## Where to go next (stage 11)
 - GPU path: create an EGL context on both X11 and Wayland and swap `ww::Renderer` for an OpenGL one that batches rectangles and a glyph atlas. Vulkan follows the same shape with more setup.
