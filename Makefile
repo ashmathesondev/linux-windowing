@@ -9,11 +9,11 @@ JOBS    ?= $(shell nproc 2>/dev/null || echo 4)
 BUILD   := build/$(PRESET)
 CACHE   := $(BUILD)/CMakeCache.txt
 PROJECT := $(notdir $(CURDIR))
-PRESETS := gcc-debug gcc-release clang-debug clang-release clang-asan
+PRESETS := gcc-debug gcc-release clang-debug clang-release clang-asan gcc-assert
 
 .DEFAULT_GOAL := all
 MAKEFLAGS += --no-print-directory
-.PHONY: all configure reconfigure build rebuild test test-asan clean distclean \
+.PHONY: all configure reconfigure build rebuild test test-asan test-assert clean distclean \
         gcc clang release asan all-presets presets help deps zip docs-check FORCE
 
 all: build ## Configure (if needed) and build with PRESET (default gcc-debug)
@@ -33,6 +33,9 @@ rebuild: clean build ## Clean PRESET, then build it
 
 test: build ## Build, then run the tests with PRESET
 	ctest --test-dir $(BUILD) --output-on-failure -j$(JOBS)
+
+test-assert: ## Run the tests with libstdc++ assertions (catches clamp(lo > hi), out of range operator[])
+	$(MAKE) test PRESET=gcc-assert
 
 test-asan: ## Build and test with Clang + ASan/UBSan
 	$(MAKE) PRESET=clang-asan test
@@ -70,9 +73,10 @@ run-%: build FORCE ## Build, then run a stage, for example `make run-p09` (extra
 	$(BUILD)/$$dir/$$dir $(ARGS)
 
 deps: ## Install the Ubuntu packages needed to build (uses sudo)
-	sudo apt install build-essential cmake pkg-config clang \
+	sudo apt install build-essential cmake git pkg-config clang \
 	    libx11-dev libxext-dev libxcb1-dev libx11-xcb-dev libxkbcommon-dev libxkbcommon-x11-dev \
-	    libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev
+	    libwayland-dev wayland-protocols libcairo2-dev libpango1.0-dev \
+	    libegl-dev libgl1-mesa-dri
 
 zip: ## Create a zip of the project one level up, without build outputs
 	cd .. && rm -f $(PROJECT).zip && zip -qr $(PROJECT).zip $(PROJECT) -x "$(PROJECT)/build/*" && echo "wrote ../$(PROJECT).zip"

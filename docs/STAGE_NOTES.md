@@ -37,5 +37,17 @@ Short reading guides. Each stage's `main.cpp` starts with a comment block explai
 - `tooltip()` asks the window loop to wake when it is due through `nextWakeupMs()`.
 - Tree nodes keep one open flag each; indentation and the id scope are pushed by `treeNode` and popped by `treePop`.
 
-## Where to go next (stage 11)
-- GPU path: create an EGL context on both X11 and Wayland and swap `ww::Renderer` for an OpenGL one that batches rectangles and a glyph atlas. Vulkan follows the same shape with more setup.
+## Stage 11: Dear ImGui on the CPU
+- `Host` is the platform half: it turns `ww::Event` into `io.Add*Event` calls, sets `DisplaySize` in logical units and `DisplayFramebufferScale` for HiDPI, and routes the clipboard and cursor.
+- `SoftRenderer` is the renderer half. It loops over `ImDrawData`: textures first (`ImTextureData` states), then each draw command with its clip rectangle. Triangles use integer edge functions and the top-left rule. Pairs of triangles that form a one colour axis aligned rectangle take a fast path.
+- ImGui queues input and needs a few frames to settle, so the demo renders at about 60 fps for 400 ms after each input and then sleeps.
+- The renderer must be destroyed before the `Host`.
+
+## Stage 12: Dear ImGui on OpenGL 3.3 core
+- `EglContext` makes a core 3.3 context on EGL's surfaceless platform, so no window system is involved. `gl33.hpp` is the function loader.
+- `GlRenderer` renders into a framebuffer object and reads the pixels back (`BGRA`) into the window's framebuffer. The projection flips y so the readback is the right way up and the scissor needs no flip.
+- The test renders the same UI with both renderers and requires the images to match within one level of 255.
+- Untested on a physical GPU. Use `LIBGL_ALWAYS_SOFTWARE=1` where there is none.
+
+## Where to go next
+- Present the GPU frame directly with an EGL window surface on both backends and drop the readback, or move to a Vulkan swapchain. See chapter 15.

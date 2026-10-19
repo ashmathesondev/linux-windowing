@@ -1,5 +1,4 @@
-cmake_minimum_required(VERSION 4.2)
-
+cmake_minimum_required(VERSION 3.20)
 project(linux_windowing VERSION 1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -15,6 +14,8 @@ endif()
 option(WW_ENABLE_SANITIZERS "Build with ASan + UBSan (Debug only)" OFF)
 option(WW_BUILD_X11 "Build the X11 stages and backend" ON)
 option(WW_BUILD_WAYLAND "Build the Wayland stages and backend" ON)
+option(WW_BUILD_IMGUI "Build the Dear ImGui stages (downloads ImGui with FetchContent)" ON)
+option(WW_BUILD_GL "Build the OpenGL stage (needs EGL; part of the ImGui stages)" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(WindowingDefaults)
@@ -41,6 +42,17 @@ if(WW_BUILD_WAYLAND)
   include(WaylandProtocols)   # defines the `ww_wayland_protocols` library
 endif()
 
+if(WW_BUILD_IMGUI)
+  include(DearImGui)
+  if(WW_BUILD_GL)
+    pkg_check_modules(EGL IMPORTED_TARGET egl)
+    if(NOT EGL_FOUND)
+      message(STATUS "EGL not found (libegl-dev): skipping the OpenGL stage")
+      set(WW_BUILD_GL OFF)
+    endif()
+  endif()
+endif()
+
 add_subdirectory(lib)
 
 enable_testing()
@@ -61,3 +73,9 @@ add_subdirectory(p07_renderer)
 add_subdirectory(p08_widgets)
 add_subdirectory(p09_polish)
 add_subdirectory(p10_controls)
+if(WW_BUILD_IMGUI)
+  add_subdirectory(p11_imgui_soft)
+  if(WW_BUILD_GL)
+    add_subdirectory(p12_imgui_gl)
+  endif()
+endif()

@@ -1,3 +1,6 @@
 add_subdirectory(platform)
 add_subdirectory(renderer)
 add_subdirectory(ui)
+if(WW_BUILD_IMGUI)
+  add_subdirectory(imgui)
+endif()

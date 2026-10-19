@@ -13,9 +13,9 @@ Toolchain: CMake + Make, Clang and GCC, developed in CLion, C++20.
 | Display protocol | Xlib or XCB, libwayland-client | Qt, GTK, wxWidgets, FLTK |
 | Windowing wrappers | none needed | SDL, GLFW (they hide exactly what you want to learn) |
 | Keyboard | libxkbcommon | |
-| 2D drawing | Cairo (optional, see stage 7) or your own rasterizer | Dear ImGui, Nuklear (they are UI systems) |
+| 2D drawing | Cairo (optional, see stage 7) or your own rasterizer | Nuklear and similar (they are UI systems). Dear ImGui is the one exception, in stages 11 and 12, where the goal is to write its backend |
 | Text | FreeType + HarfBuzz, or Pango | |
-| GPU (optional) | EGL, OpenGL, Vulkan loader | |
+| GPU (optional) | EGL, OpenGL 3.3 core (stage 12), Vulkan loader | |
 
 ---
 
@@ -106,9 +106,20 @@ Recommended approach is **immediate mode** (simplest to get right), with retaine
 - Mapping from Win32 controls (`BUTTON`, `EDIT`, `COMBOBOX`, `SysTreeView32`, `MessageBox`) to the immediate mode calls.
 - **Deliverable:** `p10_controls`, a file manager style window using every control, with headless tests.
 
-### Stage 11 (optional): GPU path
-- EGL context on both backends (`EGL_PLATFORM_X11_KHR`, `EGL_PLATFORM_WAYLAND_KHR`).
-- Draw your UI batches with OpenGL, or create a Vulkan surface with `VK_KHR_xlib_surface` / `VK_KHR_wayland_surface`.
+### Stage 11: Dear ImGui on a CPU rasterizer
+- Fetch Dear ImGui v1.93.0 with CMake `FetchContent` and build its five core files.
+- Platform half: `ww::Event` to `ImGuiIO` (mouse, keys, text, wheel, focus), clipboard, cursor shape, HiDPI through the framebuffer scale.
+- Renderer half: a triangle rasterizer for `ImDrawData` (edge functions in fixed point, top-left rule, vertex colour and UV interpolation, scissor, alpha blend, a fast path for rectangles), and the 1.92 dynamic font atlas (`ImTextureData`).
+- No graphics library.
+- **Deliverable:** `p11_imgui_soft`, pixel exact tests in `tests/imgui_soft_test.cpp`.
+
+### Stage 12: Dear ImGui on OpenGL 3.3 core
+- EGL context without a window (surfaceless platform), a hand written function loader, shaders, VAO and buffers, framebuffer object, one draw call per `ImDrawCmd`, readback into the window's framebuffer.
+- Tests run on Mesa's software driver and must match stage 11's output to within one level of 255.
+- **Deliverable:** `p12_imgui_gl`, `tests/imgui_gl_test.cpp`.
+
+### Beyond stage 12 (not implemented)
+- A real swap chain: EGL window surfaces on X11 (`EGL_PLATFORM_X11_KHR`) and Wayland (`wl_egl_window`), `eglSwapBuffers` instead of the readback, or a Vulkan swapchain (`VK_KHR_xlib_surface`, `VK_KHR_wayland_surface`).
 - Natural fit given your DX12 and OpenXR background: swapchain, frame pacing, present modes.
 
 ---
@@ -168,4 +179,4 @@ Libraries from stages 6 to 8 are static libs so later projects link against them
 | 6 (abstraction) | 2 to 3 |
 | 7 (renderer and text) | 5 to 10 |
 | 8 (widgets) | 8 to 15 |
-| 9 to 11 (polish, controls, GPU) | open ended |
+| 9 to 12 (polish, controls, ImGui on CPU and GPU) | open ended |

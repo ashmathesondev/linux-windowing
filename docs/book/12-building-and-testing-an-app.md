@@ -314,4 +314,4 @@ Run through this on each backend, ideally on two compositors:
 
 Solutions: [solutions/ch12.md](solutions/ch12.md)
 
-Previous: [Chapter 11](11-widget-catalogue.md) | Next: [Chapter 13, where to go next](13-where-next.md)
+Previous: [Chapter 11](11-widget-catalogue.md) | Next: [Chapter 13, ImGui in Sofware](13-imgui-software.md)
