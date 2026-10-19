@@ -119,6 +119,65 @@ public:
     bool dropdown(std::string_view id, const std::vector<std::string>& items, int& selected);
     bool tabBar(std::string_view id, const std::vector<std::string>& tabs, int& selected);
 
+    // ---- menus (stage 10) ---------------------------------------------------------------------
+    // A menu bar is a strip of headers; each open menu is a popup built from menuItem calls:
+    //
+    //     if (ui.beginMenuBar()) {
+    //         if (ui.beginMenu("File")) {
+    //             if (ui.menuItem("Open...", "Ctrl+O")) openFile();
+    //             ui.menuSeparator();
+    //             ui.menuItem("Word wrap", {}, &wrap);       // checkable
+    //             ui.endMenu();
+    //         }
+    //         ui.endMenuBar();
+    //     }
+    //
+    // The shortcut text is only displayed. Use shortcut() to react to the keys themselves.
+    bool beginMenuBar();
+    void endMenuBar();
+    bool beginMenu(std::string_view label);      // true while this menu is open: add items, then endMenu()
+    void endMenu();
+    bool menuItem(std::string_view label, std::string_view shortcut = {}, bool* checked = nullptr, bool enabled = true);
+    void menuSeparator();
+    // Right click on the most recent widget opens a popup menu at the mouse. Same items as above.
+    bool beginContextMenu(std::string_view id);
+    void endContextMenu();
+    bool menuOpen() const { return openMenu_ != 0; }
+    // True (once) when the key combination was pressed. Call it before widgets that own the keyboard.
+    bool shortcut(Key key, bool ctrl = false, bool shift = false, bool alt = false);
+
+    // ---- tooltips ---------------------------------------------------------------------------------
+    // Call right after a widget: shows `text` near the mouse once the pointer rested on it for a moment.
+    void tooltip(std::string_view text);
+    void setTooltipDelayMs(int ms) { tipDelayMs_ = ms; }
+    bool tooltipVisible() const { return tipShown_; }
+
+    // ---- dialogs ---------------------------------------------------------------------------------
+    // A modal dialog dims the window and blocks every widget drawn outside it. Call it LAST in the
+    // frame, so it is drawn on top. Returns false (and draws nothing) while `open` is false;
+    // Escape sets `open` to false.
+    bool beginModal(std::string_view title, bool& open, float width = 380);
+    void endModal();
+    bool modalOpen() const { return modalOpenNow_ || blockOutside_; }
+    // Ready made message box. Returns the index of the clicked button, or -1 while nothing was chosen.
+    int messageBox(std::string_view title, std::string_view message, const std::vector<std::string>& buttons, bool& open);
+
+    // ---- tree view ---------------------------------------------------------------------------------
+    struct TreeResult {
+        bool open = false;      // the node is expanded: draw its children, then call treePop()
+        bool clicked = false;   // the row was clicked this frame (select it in your own data)
+    };
+    // defaultOpen only matters the first time the node is seen; after that the user decides.
+    TreeResult treeNode(std::string_view label, bool selected = false, bool defaultOpen = false);
+    bool treeLeaf(std::string_view label, bool selected = false);   // returns true when clicked
+    void treePop();
+
+    // ---- more controls ---------------------------------------------------------------------------
+    // Number field with up/down buttons. Arrow keys and the mouse wheel work too.
+    bool spinBox(std::string_view id, int& value, int minValue, int maxValue, int step = 1);
+    // Pinned to the bottom edge of the window. Call it last; panes are drawn left to right.
+    void statusBar(const std::vector<std::string>& panes);
+
     // Width left in the current row or column, and the width a text would take in the UI font.
     // Together they allow right aligned widgets: ui.space(ui.availableWidth() - ui.textWidth("Save") - 32).
     float availableWidth() const;
@@ -167,6 +226,7 @@ private:
         bool released[3] = {false, false, false};
         int clickCount = 0;
         float scrollX = 0, scrollY = 0;
+        bool moved = false;        // the pointer moved since the last frame
         Modifiers mods;
         std::vector<std::variant<KeyEvent, TextEvent>> keyboard;   // in arrival order
     };
@@ -231,9 +291,59 @@ private:
     Id openDropdown_ = 0;
     Rect popupRect_{};            // area of the open popup this frame; blocks hover for widgets below
     bool popupOpenNow_ = false;
+    bool prevPopupActive_ = false;   // last frame's popup: widgets drawn before it in this frame must still ignore it
+    Rect prevPopupRect_{};
     std::vector<std::function<void(Renderer&)>> overlays_;
 
     Clock::time_point blinkEpoch_ = Clock::now();
+
+    // menus
+    struct MenuBarState {
+        Rect rect{};
+        float x = 0;
+    };
+    struct MenuBuild {
+        bool active = false;
+        Id id = 0;
+        Rect popup{};
+        float y = 0;        // cursor inside the popup
+        float widest = 0;   // widest item this frame, used for the width next frame
+        int index = 0;      // number of items so far (separators do not count)
+    };
+    void beginMenuPopup(Id id, float x, float y);
+    void endMenuPopup();
+    Id openMenu_ = 0;
+    bool openMenuIsBar_ = false;
+    bool menuSeenNow_ = false;
+    int menuHighlight_ = -1;
+    float ctxX_ = 0, ctxY_ = 0;
+    MenuBarState menuBar_;
+    std::vector<Id> barMenusNow_;
+    MenuBuild mb_;
+    std::unordered_map<Id, std::pair<float, float>> menuSizes_;   // width, height from the previous frame
+
+    // tooltips
+    Id tipKey_ = 0;
+    bool tipHoveredNow_ = false;
+    bool tipShownNow_ = false;
+    bool tipShown_ = false;
+    int tipWakeMs_ = -1;
+    int tipDelayMs_ = 500;
+    Clock::time_point tipSince_ = Clock::now();
+
+    // modal dialogs and trees
+    struct ModalFrame {
+        Id id;
+        float top;
+    };
+    TreeResult treeRow(std::string_view label, bool selected, bool leaf, bool defaultOpen);
+    bool modalOpenNow_ = false;    // a modal was drawn this frame
+    bool blockOutside_ = false;    // a modal was drawn last frame: widgets outside it are inert
+    bool insideModal_ = false;
+    std::vector<ModalFrame> modalStack_;
+    std::unordered_map<Id, float> modalHeights_;
+    std::unordered_map<Id, bool> treeOpen_;
+    int treeDepth_ = 0;
 
     std::function<void(const std::string&)> clipboardSet_;
     std::function<std::string()> clipboardGet_;

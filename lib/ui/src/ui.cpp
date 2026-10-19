@@ -155,6 +155,7 @@ void Context::handleEvent(const Event& event) {
                 input_.mouseX = e.x;
                 input_.mouseY = e.y;
                 input_.mods = e.mods;
+                input_.moved = true;
             } else if constexpr (std::is_same_v<T, MouseLeaveEvent>) {
                 input_.mouseX = input_.mouseY = -10000;
             } else if constexpr (std::is_same_v<T, MouseButtonEvent>) {
@@ -202,6 +203,8 @@ void Context::beginFrame(Renderer& renderer) {
     idStack_.clear();
     clipStack_.clear();
     overlays_.clear();
+    prevPopupActive_ = popupOpenNow_;
+    prevPopupRect_ = popupRect_;
     popupOpenNow_ = false;
     disabledDepth_ = 0;
     nextWidth_ = 0;
@@ -217,6 +220,16 @@ void Context::beginFrame(Renderer& renderer) {
     cardStack_.clear();
     cardStartY_.clear();
     scrollStack_.clear();
+    menuSeenNow_ = false;
+    mb_ = {};
+    tipHoveredNow_ = false;
+    tipShownNow_ = false;
+    tipWakeMs_ = -1;
+    blockOutside_ = modalOpenNow_;   // what was drawn last frame decides what is inert now
+    modalOpenNow_ = false;
+    insideModal_ = false;
+    modalStack_.clear();
+    treeDepth_ = 0;
 
     // Tab / Shift+Tab move focus; take them out of the keyboard queue.
     tabRequested_ = shiftTabRequested_ = false;
@@ -258,6 +271,9 @@ void Context::endFrame() {
     if (input_.pressed[0] && !pressClaimed_) focusId_ = 0;
     if (!input_.down[0]) activeId_ = 0;
     if (!popupOpenNow_) openDropdown_ = 0;
+    if (!menuSeenNow_) openMenu_ = 0;
+    if (!tipHoveredNow_) tipKey_ = 0;
+    tipShown_ = tipShownNow_;
 
     // Card backgrounds use the height measured in the previous frame. If it changed, draw once more.
     for (const auto& [id, h] : cardHeightsNow_) {
@@ -269,15 +285,20 @@ void Context::endFrame() {
     input_.pressed[0] = input_.pressed[1] = input_.pressed[2] = false;
     input_.released[0] = input_.released[1] = input_.released[2] = false;
     input_.scrollX = input_.scrollY = 0;
+    input_.moved = false;
     input_.keyboard.clear();
     renderer_ = nullptr;
 }
 
 int Context::nextWakeupMs() const {
-    if (!textFocusActive_) return -1;
-    constexpr int period = 530;
-    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - blinkEpoch_).count();
-    return std::max(1, period - static_cast<int>(elapsed % period));
+    int result = -1;
+    if (textFocusActive_) {
+        constexpr int period = 530;
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - blinkEpoch_).count();
+        result = std::max(1, period - static_cast<int>(elapsed % period));
+    }
+    if (tipWakeMs_ >= 0) result = result < 0 ? std::max(tipWakeMs_, 1) : std::min(result, std::max(tipWakeMs_, 1));
+    return result;
 }
 
 // =====================================================================================
@@ -513,8 +534,10 @@ void Context::endScroll() {
 // =====================================================================================
 bool Context::hovered(Rect r) const {
     if (!r.contains(input_.mouseX, input_.mouseY)) return false;
+    if (blockOutside_ && !insideModal_) return false;   // a modal dialog owns the mouse
     if (!clipStack_.empty() && !clipStack_.back().contains(input_.mouseX, input_.mouseY)) return false;
     if (popupOpenNow_ && popupRect_.contains(input_.mouseX, input_.mouseY)) return false;
+    if (prevPopupActive_ && prevPopupRect_.contains(input_.mouseX, input_.mouseY)) return false;
     return true;
 }
 
@@ -538,6 +561,7 @@ bool Context::clickBehavior(Id id, Rect r, bool& hover, bool& held) {
 
 void Context::registerFocusable(Id id) {
     if (!enabled()) return;
+    if (blockOutside_ && !insideModal_) return;         // and the keyboard focus order
     if (!firstFocusable_) firstFocusable_ = id;
 
     if (tabRequested_ && (focusId_ == 0 || lastFocusable_ == focusId_)) {

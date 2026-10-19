@@ -29,6 +29,11 @@ public:
         send(MouseButtonEvent{MouseButton::Left, true, x, y, mods_, clickCount});
     }
     void mouseUp(float x, float y) { send(MouseButtonEvent{MouseButton::Left, false, x, y, mods_, 0}); }
+    void rightClick(float x, float y) {
+        send(MouseMoveEvent{x, y, mods_});
+        send(MouseButtonEvent{MouseButton::Right, true, x, y, mods_, 1});
+        send(MouseButtonEvent{MouseButton::Right, false, x, y, mods_, 0});
+    }
     void scroll(float x, float y, float notches) { send(ScrollEvent{0, notches, x, y, mods_}); }
 
     void key(Key key, Modifiers mods = {}) {
